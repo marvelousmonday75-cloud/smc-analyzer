@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC Setup Analyzer — Phase 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#10131A;
+    --panel:#171B24;
+    --panel-alt:#1D2230;
+    --border:#2B3040;
+    --text:#ECE9E2;
+    --text-dim:#8A90A3;
+    --accent:#C9A227;
+    --accent-dim:#8f7420;
+    --bull:#2FA88A;
+    --bear:#E0654B;
+    --warn:#E3B23C;
+    --neutral:#3A4054;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px;}
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.12em;
+    color:var(--accent);
+    text-transform:uppercase;
+    margin-bottom:8px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:28px;
+    font-weight:600;
+    margin:0 0 6px;
+  }
+  .subhead{color:var(--text-dim);font-size:14px;max-width:640px;}
+
+  .chain{
+    display:flex;
+    gap:4px;
+    margin:24px 0 8px;
+    overflow-x:auto;
+    padding-bottom:4px;
+  }
+  .chain-step{
+    flex:1;
+    min-width:88px;
+    text-align:center;
+    padding:10px 6px;
+    border-radius:6px;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    position:relative;
+    transition:all .15s ease;
+  }
+  .chain-step .n{display:block;font-size:10px;color:var(--text-dim);margin-bottom:2px;}
+  .chain-step.pass{
+    background:rgba(47,168,138,0.14);
+    border-color:var(--bull);
+    color:var(--bull);
+  }
+  .chain-step.fail{
+    background:rgba(224,101,75,0.12);
+    border-color:var(--bear);
+    color:var(--bear);
+  }
+  .chain-connector{
+    width:8px;
+    align-self:center;
+    height:1px;
+    background:var(--border);
+    flex-shrink:0;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:1.1fr 0.9fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:860px){
+    .grid{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:20px 22px;
+  }
+  .section{margin-bottom:22px;}
+  .section:last-child{margin-bottom:0;}
+  .section-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    color:var(--accent);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin-bottom:12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .section-title .idx{
+    font-family:'IBM Plex Mono',monospace;
+    color:var(--text-dim);
+    font-weight:400;
+  }
+  .section-title .tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    color:var(--text-dim);
+    text-transform:none;
+    letter-spacing:0;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    padding:2px 7px;
+    border-radius:10px;
+    margin-left:auto;
+  }
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .row.single{grid-template-columns:1fr;}
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:5px;
+  }
+  input[type=text], input[type=number], select, textarea{
+    width:100%;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:6px;
+    padding:9px 10px;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:13.5px;
+    outline:none;
+  }
+  textarea{resize:vertical;min-height:64px;}
+  input:focus, select:focus, textarea:focus{border-color:var(--accent);}
+  .toggle-group{display:flex;gap:8px;}
+  .toggle-btn{
+    flex:1;
+    padding:9px 8px;
+    text-align:center;
+    border-radius:6px;
+    border:1px solid var(--border);
+    background:var(--panel-alt);
+    color:var(--text-dim);
+    font-size:13px;
+    cursor:pointer;
+    user-select:none;
+    transition:all .12s ease;
+  }
+  .toggle-btn.active-yes{background:rgba(47,168,138,0.16);border-color:var(--bull);color:var(--bull);}
+  .toggle-btn.active-no{background:rgba(224,101,75,0.14);border-color:var(--bear);color:var(--bear);}
+
+  .analyze-btn{
+    width:100%;
+    padding:13px;
+    margin-top:8px;
+    border-radius:8px;
+    border:none;
+    background:var(--accent);
+    color:#1A1608;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    letter-spacing:0.02em;
+  }
+  .analyze-btn:hover{background:#d9b333;}
+
+  /* results */
+  .results{position:sticky;top:20px;}
+  .verdict{
+    border-radius:8px;
+    padding:16px 18px;
+    margin-bottom:16px;
+    border:1px solid var(--border);
+    background:var(--panel-alt);
+  }
+  .verdict-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    margin-bottom:6px;
+  }
+  .verdict-text{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:18px;
+    font-weight:600;
+    line-height:1.35;
+  }
+  .verdict.qualifies{border-color:var(--bull);}
+  .verdict.qualifies .verdict-text{color:var(--bull);}
+  .verdict.caution{border-color:var(--warn);}
+  .verdict.caution .verdict-text{color:var(--warn);}
+  .verdict.reject{border-color:var(--bear);}
+  .verdict.reject .verdict-text{color:var(--bear);}
+  .verdict.empty .verdict-text{color:var(--text-dim);}
+
+  .score-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .score-num{font-size:22px;font-weight:600;}
+  .score-lbl{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;}
+
+  .rr-box{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .rr-card{
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:10px 12px;
+  }
+  .rr-card.gate{grid-column:1 / -1;}
+  .rr-card .lbl{font-size:11px;color:var(--text-dim);margin-bottom:3px;}
+  .rr-card .val{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;}
+  .rr-card .val.ok{color:var(--bull);}
+  .rr-card .val.bad{color:var(--bear);}
+
+  .rules{list-style:none;margin:0 0 16px;padding:0;}
+  .rules li{
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+    padding:9px 0;
+    border-top:1px solid var(--border);
+    font-size:12.5px;
+  }
+  .rules li:first-child{border-top:none;}
+  .mark{
+    flex-shrink:0;
+    width:16px;height:16px;
+    border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;
+    font-weight:700;
+    margin-top:1px;
+  }
+  .mark.pass{background:rgba(47,168,138,0.18);color:var(--bull);}
+  .mark.fail{background:rgba(224,101,75,0.16);color:var(--bear);}
+  .rule-text b{color:var(--text);}
+  .rule-text{color:var(--text-dim);}
+
+  .flag-box{
+    background:rgba(227,178,60,0.08);
+    border:1px solid var(--warn);
+    border-radius:6px;
+    padding:12px 14px;
+    margin-bottom:16px;
+  }
+  .flag-box .flag-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--warn);
+    margin-bottom:8px;
+  }
+  .flag-box.clear{
+    background:var(--panel-alt);
+    border-color:var(--border);
+  }
+  .flag-box.clear .flag-title{color:var(--text-dim);}
+  .flag-item{font-size:12.5px;color:var(--text-dim);margin-bottom:4px;}
+  .flag-item b{color:var(--warn);}
+  .flag-def{
+    font-size:11px;
+    color:var(--text-dim);
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid var(--border);
+    line-height:1.6;
+  }
+
+  .disclaimer{
+    margin-top:4px;
+    padding-top:14px;
+    border-top:1px solid var(--border);
+    font-size:11.5px;
+    color:var(--text-dim);
+    line-height:1.6;
+  }
+  .disclaimer b{color:var(--accent-dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">SMC Setup Analyzer — Phase 1 · Rule-Based Checklist</div>
+    <h1>Setup Analyzer</h1>
+    <div class="subhead">Enter the conditions of a potential setup. The result is a transparent, rule-based checklist score — not a predicted probability. Historical win-rate stats arrive in a later phase, once enough setups have been journaled.</div>
+  </header>
+
+  <div class="chain" id="chain"></div>
+
+  <div class="grid">
+    <div class="panel">
+
+      <div class="section">
+        <div class="section-title"><span class="idx">00</span> Trade context</div>
+        <div class="row">
+          <div class="field"><label>Asset / pair</label><input type="text" id="asset" placeholder="XAUUSD"></div>
+          <div class="field"><label>Entry timeframe</label>
+            <select id="entry-tf">
+              <option>1m</option><option>5m</option><option selected>15m</option>
+              <option>1H</option><option>4H</option><option>Daily</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Session</label>
+            <select id="session">
+              <option>Asia</option><option selected>London</option><option>New York AM</option>
+              <option>New York PM</option><option>London/NY Overlap</option>
+            </select>
+          </div>
+          <div class="field"><label>Direction</label>
+            <div class="toggle-group" id="direction-group">
+              <div class="toggle-btn" data-val="BUY">BUY</div>
+              <div class="toggle-btn" data-val="SELL">SELL</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">01</span> HTF bias</div>
+        <div class="row">
+          <div class="field">
+            <label>Bias</label>
+            <div class="toggle-group" id="bias-group">
+              <div class="toggle-btn" data-val="Bullish">Bullish</div>
+              <div class="toggle-btn" data-val="Bearish">Bearish</div>
+              <div class="toggle-btn" data-val="Neutral">Neutral</div>
+            </div>
+          </div>
+          <div class="field"><label>Higher timeframe used</label>
+            <select id="htf-tf">
+              <option>1H</option><option>4H</option><option selected>Daily</option>
+              <option>Weekly</option><option>Monthly</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">02</span> Liquidity</div>
+        <div class="row">
+          <div class="field"><label>Liquidity type</label>
+            <select id="liq-type">
+              <option value="">None identified</option>
+              <option>Equal highs/lows</option>
+              <option>Session high/low</option>
+              <option>Swing high/low</option>
+              <option>Trendline liquidity</option>
+              <option>Daily/weekly high-low</option>
+            </select>
+          </div>
+          <div class="field"><label>Sweep occurred</label>
+            <div class="toggle-group" id="sweep-group">
+              <div class="toggle-btn" data-val="yes">Yes</div>
+              <div class="toggle-btn" data-val="no">No</div>
+            </div>
+          </div>
+        </div>
+        <div class="row single" id="sweep-type-row" style="display:none;">
+          <div class="field"><label>Sweep type</label>
+            <div class="toggle-group" id="sweep-type-group">
+              <div class="toggle-btn" data-val="Sell-side">Sell-side (swept lows)</div>
+              <div class="toggle-btn" data-val="Buy-side">Buy-side (swept highs)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">03</span> Displacement</div>
+        <div class="row single">
+          <div class="field">
+            <div class="toggle-group" id="displacement-group">
+              <div class="toggle-btn" data-val="yes">Yes</div>
+              <div class="toggle-btn" data-val="no">No</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">04</span> FVG / order block <span class="tag">either is sufficient</span></div>
+        <div class="row">
+          <div class="field"><label>FVG present</label>
+            <div class="toggle-group" id="fvg-group">
+              <div class="toggle-btn" data-val="yes">Yes</div>
+              <div class="toggle-btn" data-val="no">No</div>
+            </div>
+          </div>
+          <div class="field"><label>FVG direction</label>
+            <select id="fvg-dir">
+              <option value="">—</option>
+              <option>Bullish</option>
+              <option>Bearish</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Order block present</label>
+            <div class="toggle-group" id="ob-group">
+              <div class="toggle-btn" data-val="yes">Yes</div>
+              <div class="toggle-btn" data-val="no">No</div>
+            </div>
+          </div>
+          <div class="field"><label>OB direction</label>
+            <select id="ob-dir">
+              <option value="">—</option>
+              <option>Bullish</option>
+              <option>Bearish</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">05</span> Retracement</div>
+        <div class="row single">
+          <div class="field">
+            <div class="toggle-group" id="retracement-group">
+              <div class="toggle-btn" data-val="yes">Yes</div>
+              <div class="toggle-btn" data-val="no">No</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">06</span> Confirmation</div>
+        <div class="row single">
+          <div class="field">
+            <div class="toggle-group" id="confirmation-group">
+              <div class="toggle-btn" data-val="yes">Yes</div>
+              <div class="toggle-btn" data-val="no">No</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">07</span> Trade levels <span class="tag">R:R is a hard gate</span></div>
+        <div class="row">
+          <div class="field"><label>Entry price</label><input type="number" id="entry" step="any" placeholder="2415.50"></div>
+          <div class="field"><label>Stop loss</label><input type="number" id="sl" step="any" placeholder="2410.00"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Take profit</label><input type="number" id="tp" step="any" placeholder="2432.00"></div>
+          <div class="field"><label>Minimum R:R required</label><input type="number" id="rr-min" step="0.1" value="2"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="idx">08</span> Journal fields <span class="tag">saved in phase 2</span></div>
+        <div class="row">
+          <div class="field"><label>Setup grade</label>
+            <select id="grade">
+              <option value="">—</option>
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+          </div>
+          <div class="field"><label>Screenshot reference</label><input type="text" id="screenshot" placeholder="url or filename"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Trade taken</label>
+            <div class="toggle-group" id="taken-group">
+              <div class="toggle-btn" data-val="yes">Yes</div>
+              <div class="toggle-btn" data-val="no">No</div>
+            </div>
+          </div>
+          <div class="field"><label>Outcome</label>
+            <select id="outcome">
+              <option value="">—</option>
+              <option>Win</option><option>Loss</option><option>Breakeven</option><option>No Trade</option>
+            </select>
+          </div>
+        </div>
+        <div class="row single">
+          <div class="field"><label>Notes</label><textarea id="notes" placeholder="Anything worth remembering about this setup..."></textarea></div>
+        </div>
+      </div>
+
+      <button class="analyze-btn" id="analyze-btn">Analyze setup</button>
+    </div>
+
+    <div class="panel results" id="results-panel">
+      <div class="verdict empty" id="verdict-box">
+        <div class="verdict-label">Verdict</div>
+        <div class="verdict-text" id="verdict-text">Fill in the checklist and analyze</div>
+      </div>
+
+      <div class="score-row">
+        <div><span class="score-lbl">Confluence score</span><br><span class="score-num" id="score-num">–</span></div>
+        <div style="text-align:right;"><span class="score-lbl">Rules passed</span><br><span class="score-num" id="score-frac">–</span></div>
+      </div>
+
+      <div class="rr-box">
+        <div class="rr-card">
+          <div class="lbl">Risk (SL distance)</div>
+          <div class="val" id="risk-val">–</div>
+        </div>
+        <div class="rr-card">
+          <div class="lbl">Reward (TP distance)</div>
+          <div class="val" id="reward-val">–</div>
+        </div>
+        <div class="rr-card gate">
+          <div class="lbl">R:R at entry vs. minimum required</div>
+          <div class="val" id="rr-val">–</div>
+        </div>
+      </div>
+
+      <ul class="rules" id="rules-list"></ul>
+
+      <div class="flag-box clear" id="flag-box">
+        <div class="flag-title" id="flag-title">Directional check</div>
+        <div id="flag-content"></div>
+        <div class="flag-def">
+          Default working definitions (edit <code>DIRECTIONAL_RULES</code> in code to refine): sell-side liquidity = resting liquidity below prior lows; buy-side liquidity = resting liquidity above prior highs. A bullish setup is expected to sweep sell-side liquidity before a bullish FVG/OB forms; a bearish setup is expected to sweep buy-side liquidity before a bearish FVG/OB forms. These are provisional and do not block the score — they're flagged for review only.
+        </div>
+      </div>
+
+      <div class="disclaimer">
+        <b>How to read this:</b> the confluence score is a count of rules explicitly defined by your framework — it is not a win probability. "SETUP QUALIFIES" requires both 7/7 confluence <b>and</b> R:R at or above your minimum; either one alone is not enough. No claim is made about how often a setup like this actually reaches TP before SL — that comes later, once Phase 2 (journal) and Phase 3 (statistics) have real historical data behind them.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/*
+  DIRECTIONAL_RULES defines the current working definitions used only to
+  flag potential directional conflicts (not to fail the checklist).
+  These are provisional. Edit here once the definitions below are finalized:
+    - buy-side liquidity  = resting stops above prior highs
+    - sell-side liquidity = resting stops below prior lows
+    - a "valid" sweep     = price trades through that liquidity level and
+                             (ideally) closes back on the other side
+  Until those are precisely defined and agreed, directional mismatches are
+  shown as warnings only.
+*/
+const DIRECTIONAL_RULES = {
+  Bullish: { expectedSweep: 'Sell-side', expectedPOI: 'Bullish' },
+  Bearish: { expectedSweep: 'Buy-side',  expectedPOI: 'Bearish' }
+};
+
+const state = {
+  direction: null,
+  bias: null,
+  sweep: null,
+  sweepType: null,
+  displacement: null,
+  fvg: null,
+  ob: null,
+  retracement: null,
+  confirmation: null,
+  taken: null
+};
+
+function wireToggleGroup(id, key, extra){
+  const group = document.getElementById(id);
+  group.querySelectorAll('.toggle-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      group.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active-yes','active-no'));
+      const val = btn.dataset.val;
+      state[key] = val;
+      const cls = (val === 'no' || val === 'Bearish' || val === 'SELL') ? 'active-no' : 'active-yes';
+      btn.classList.add(cls);
+      if(extra) extra(val);
+    });
+  });
+}
+
+wireToggleGroup('direction-group','direction');
+wireToggleGroup('bias-group','bias');
+wireToggleGroup('sweep-group','sweep', (val)=>{
+  document.getElementById('sweep-type-row').style.display = val === 'yes' ? 'block' : 'none';
+});
+wireToggleGroup('sweep-type-group','sweepType');
+wireToggleGroup('displacement-group','displacement');
+wireToggleGroup('fvg-group','fvg');
+wireToggleGroup('ob-group','ob');
+wireToggleGroup('retracement-group','retracement');
+wireToggleGroup('confirmation-group','confirmation');
+wireToggleGroup('taken-group','taken');
+
+const CHAIN_STEPS = [
+  {key:'bias', label:'HTF bias'},
+  {key:'liquidity', label:'Liquidity'},
+  {key:'sweep', label:'Sweep'},
+  {key:'displacement', label:'Displacement'},
+  {key:'fvgob', label:'FVG / OB'},
+  {key:'retracement', label:'Retracement'},
+  {key:'confirmation', label:'Confirmation'}
+];
+
+function renderChainSkeleton(){
+  const chain = document.getElementById('chain');
+  chain.innerHTML = '';
+  CHAIN_STEPS.forEach((step, i)=>{
+    const el = document.createElement('div');
+    el.className = 'chain-step';
+    el.id = 'chain-'+step.key;
+    el.innerHTML = '<span class="n">0'+(i+1)+'</span>'+step.label;
+    chain.appendChild(el);
+    if(i < CHAIN_STEPS.length - 1){
+      const conn = document.createElement('div');
+      conn.className = 'chain-connector';
+      chain.appendChild(conn);
+    }
+  });
+}
+renderChainSkeleton();
+
+function fmtNum(n){
+  if(n === null || n === undefined || isNaN(n)) return '–';
+  return Number(n).toLocaleString(undefined,{maximumFractionDigits:4});
+}
+
+function evaluate(){
+  const liqType = document.getElementById('liq-type').value;
+  const fvgDir = document.getElementById('fvg-dir').value;
+  const obDir = document.getElementById('ob-dir').value;
+  const entry = parseFloat(document.getElementById('entry').value);
+  const sl = parseFloat(document.getElementById('sl').value);
+  const tp = parseFloat(document.getElementById('tp').value);
+  const rrMin = parseFloat(document.getElementById('rr-min').value) || 0;
+
+  const rules = [];
+  const flags = [];
+  let hardFail = null;
+
+  // Rule 1: HTF bias defined
+  const biasDefined = state.bias === 'Bullish' || state.bias === 'Bearish';
+  rules.push({
+    pass: biasDefined,
+    text: biasDefined
+      ? '<b>HTF bias</b> is defined (' + state.bias + ').'
+      : '<b>HTF bias</b> is not defined as bullish or bearish. A neutral/undefined bias means there is no directional setup to evaluate.'
+  });
+  if(!biasDefined) hardFail = 'HTF bias is neutral or undefined — there is no directional setup to score.';
+
+  // Rule 2: liquidity identified
+  const liqIdentified = !!liqType;
+  rules.push({
+    pass: liqIdentified,
+    text: liqIdentified
+      ? '<b>Liquidity</b> identified (' + liqType + ').'
+      : '<b>Liquidity</b> not identified — no liquidity pool selected.'
+  });
+
+  // Rule 3: sweep occurred (direction is checked separately as a flag, not a fail condition)
+  const sweepYes = state.sweep === 'yes';
+  rules.push({
+    pass: sweepYes,
+    text: sweepYes
+      ? '<b>Liquidity sweep</b> occurred (' + (state.sweepType || 'type not set') + ').'
+      : '<b>Liquidity sweep</b> has not occurred.'
+  });
+  if(sweepYes && biasDefined && state.sweepType){
+    const expected = DIRECTIONAL_RULES[state.bias].expectedSweep;
+    if(state.sweepType !== expected){
+      flags.push('Sweep type is <b>' + state.sweepType + '</b>, but a ' + state.bias + ' bias is currently expected to sweep <b>' + expected + '</b> liquidity.');
+    }
+  }
+
+  // Rule 4: displacement
+  const dispYes = state.displacement === 'yes';
+  rules.push({
+    pass: dispYes,
+    text: dispYes ? '<b>Displacement</b> confirmed.' : '<b>Displacement</b> has not occurred.'
+  });
+
+  // Rule 5: FVG or OB present — either is sufficient. Stored separately for phase 3.
+  const fvgYes = state.fvg === 'yes';
+  const obYes = state.ob === 'yes';
+  const poiPresent = fvgYes || obYes;
+  let poiType = 'None';
+  if(fvgYes && obYes) poiType = 'FVG + OB';
+  else if(fvgYes) poiType = 'FVG only';
+  else if(obYes) poiType = 'OB only';
+  rules.push({
+    pass: poiPresent,
+    text: poiPresent
+      ? '<b>FVG/OB</b> present (' + poiType + ').'
+      : '<b>FVG/OB</b> — neither a fair value gap nor an order block is present.'
+  });
+  if(biasDefined){
+    const expectedPOI = DIRECTIONAL_RULES[state.bias].expectedPOI;
+    if(fvgYes && fvgDir && fvgDir !== expectedPOI){
+      flags.push('FVG direction is <b>' + fvgDir + '</b>, which conflicts with the ' + state.bias + ' bias (expected ' + expectedPOI + ').');
+    }
+    if(obYes && obDir && obDir !== expectedPOI){
+      flags.push('Order block direction is <b>' + obDir + '</b>, which conflicts with the ' + state.bias + ' bias (expected ' + expectedPOI + ').');
+    }
+  }
+
+  // Rule 6: retracement
+  const retYes = state.retracement === 'yes';
+  rules.push({
+    pass: retYes,
+    text: retYes ? '<b>Retracement</b> into the FVG/OB confirmed.' : '<b>Retracement</b> into the FVG/OB has not occurred yet.'
+  });
+
+  // Rule 7: confirmation
+  const confYes = state.confirmation === 'yes';
+  rules.push({
+    pass: confYes,
+    text: confYes ? '<b>Confirmation</b> present on entry timeframe.' : '<b>Confirmation</b> not yet present.'
+  });
+
+  const score = rules.filter(r => r.pass).length;
+
+  // R:R calc — hard gate for "qualifies"
+  let risk = null, reward = null, rr = null;
+  if(!isNaN(entry) && !isNaN(sl) && !isNaN(tp)){
+    risk = Math.abs(entry - sl);
+    reward = Math.abs(tp - entry);
+    rr = risk > 0 ? reward / risk : null;
+  }
+  const rrKnown = rr !== null;
+  const rrOk = rrKnown && rr >= rrMin;
+
+  // Verdict — QUALIFIES requires 7/7 AND R:R >= minimum, both required
+  let verdictClass, verdictText;
+  if(hardFail){
+    verdictClass = 'reject';
+    verdictText = 'INVALID SETUP — ' + hardFail;
+  } else if(score === 7 && rrOk){
+    verdictClass = 'qualifies';
+    verdictText = 'SETUP QUALIFIES';
+  } else if(score === 7 && !rrOk){
+    verdictClass = 'reject';
+    verdictText = 'DOES NOT QUALIFY — full confluence (7/7) but R:R is ' + (rrKnown ? ('below the ' + fmtNum(rrMin) + ' minimum') : 'not calculable (check entry/SL/TP)');
+  } else if(score >= 5){
+    verdictClass = 'caution';
+    verdictText = 'PARTIAL — WAIT FOR MORE CONFLUENCE (' + score + '/7)';
+  } else {
+    verdictClass = 'reject';
+    verdictText = 'DOES NOT QUALIFY (' + score + '/7)';
+  }
+
+  // Render chain
+  const chainMap = {
+    bias: biasDefined,
+    liquidity: liqIdentified,
+    sweep: sweepYes,
+    displacement: dispYes,
+    fvgob: poiPresent,
+    retracement: retYes,
+    confirmation: confYes
+  };
+  CHAIN_STEPS.forEach(step=>{
+    const el = document.getElementById('chain-'+step.key);
+    el.classList.remove('pass','fail');
+    el.classList.add(chainMap[step.key] ? 'pass' : 'fail');
+  });
+
+  // Render verdict
+  const vBox = document.getElementById('verdict-box');
+  vBox.className = 'verdict ' + verdictClass;
+  document.getElementById('verdict-text').textContent = verdictText;
+
+  document.getElementById('score-num').textContent = score + '/7';
+  document.getElementById('score-frac').textContent = score + ' of 7 rules';
+
+  document.getElementById('risk-val').textContent = risk === null ? '–' : fmtNum(risk);
+  document.getElementById('reward-val').textContent = reward === null ? '–' : fmtNum(reward);
+  const rrValEl = document.getElementById('rr-val');
+  rrValEl.textContent = (rr === null ? '–' : '1 : ' + fmtNum(rr)) + '  vs.  1 : ' + fmtNum(rrMin) + ' min';
+  rrValEl.className = 'val ' + (rr === null ? '' : (rrOk ? 'ok' : 'bad'));
+
+  const rulesList = document.getElementById('rules-list');
+  rulesList.innerHTML = '';
+  rules.forEach(r=>{
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="mark ' + (r.pass ? 'pass' : 'fail') + '">' + (r.pass ? '✓' : '✕') + '</span><span class="rule-text">' + r.text + '</span>';
+    rulesList.appendChild(li);
+  });
+
+  // Render directional flags (never affects score/verdict)
+  const flagBox = document.getElementById('flag-box');
+  const flagTitle = document.getElementById('flag-title');
+  const flagContent = document.getElementById('flag-content');
+  flagContent.innerHTML = '';
+  if(flags.length > 0){
+    flagBox.classList.remove('clear');
+    flagTitle.textContent = 'Directional check — ' + flags.length + ' potential conflict' + (flags.length > 1 ? 's' : '') + ' flagged';
+    flags.forEach(f=>{
+      const div = document.createElement('div');
+      div.className = 'flag-item';
+      div.innerHTML = f;
+      flagContent.appendChild(div);
+    });
+  } else {
+    flagBox.classList.add('clear');
+    flagTitle.textContent = 'Directional check';
+    flagContent.innerHTML = '<div class="flag-item">No directional conflicts flagged under the current default definitions.</div>';
+  }
+}
+
+document.getElementById('analyze-btn').addEventListener('click', evaluate);
+</script>
+</body>
+</html>
