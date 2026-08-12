@@ -397,6 +397,497 @@ function saveCurrent(){
 document.getElementById('save-btn').addEventListener('click',saveCurrent);
 if(!canStore)document.getElementById('storage-warning').style.display='block';
 renderJournal();
+  /* =========================================================
+   PHASE 3 — STATISTICS ENGINE
+   ========================================================= */
+
+/*
+  Phase 3 does NOT create another database.
+
+  It reads the existing:
+      journal:entries
+
+  and calculates historical statistics from it.
+
+  No prediction is made.
+  No probability is invented.
+*/
+
+function getCompletedTradeEntries(entries){
+  return entries.filter(entry => {
+    return entry.outcome === 'Win' ||
+           entry.outcome === 'Loss' ||
+           entry.outcome === 'Breakeven';
+  });
+}
+
+function getTakenEntries(entries){
+  return entries.filter(entry => entry.taken === 'yes');
+}
+
+function calculateStats(entries){
+
+  const completed = getCompletedTradeEntries(entries);
+
+  const wins = completed.filter(e => e.outcome === 'Win');
+  const losses = completed.filter(e => e.outcome === 'Loss');
+  const breakevens = completed.filter(e => e.outcome === 'Breakeven');
+
+  const rValues = completed
+    .map(e => Number(e.rAchieved))
+    .filter(v => Number.isFinite(v));
+
+  const totalR = rValues.length
+    ? rValues.reduce((sum, value) => sum + value, 0)
+    : null;
+
+  const averageR = rValues.length
+    ? totalR / rValues.length
+    : null;
+
+  const winRate = completed.length
+    ? (wins.length / completed.length) * 100
+    : null;
+
+  return {
+    totalSetups: entries.length,
+    tradesTaken: getTakenEntries(entries).length,
+    completedTrades: completed.length,
+    wins: wins.length,
+    losses: losses.length,
+    breakevens: breakevens.length,
+    winRate,
+    totalR,
+    averageR,
+    rCount: rValues.length
+  };
+}
+
+
+function groupEntries(entries, property){
+
+  const groups = {};
+
+  entries.forEach(entry => {
+
+    let key = entry[property];
+
+    if(key === null || key === undefined || key === ''){
+      key = 'Unspecified';
+    }
+
+    if(!groups[key]){
+      groups[key] = [];
+    }
+
+    groups[key].push(entry);
+
+  });
+
+  return groups;
+}
+
+
+function groupEntriesByScore(entries){
+
+  const groups = {};
+
+  entries.forEach(entry => {
+
+    const key = Number.isFinite(Number(entry.score))
+      ? Number(entry.score) + '/7'
+      : 'Unknown';
+
+    if(!groups[key]){
+      groups[key] = [];
+    }
+
+    groups[key].push(entry);
+
+  });
+
+  return groups;
+}
+
+
+function getGroupMetrics(entries){
+
+  const completed = getCompletedTradeEntries(entries);
+
+  const wins = completed.filter(e => e.outcome === 'Win');
+  const losses = completed.filter(e => e.outcome === 'Loss');
+
+  const rValues = completed
+    .map(e => Number(e.rAchieved))
+    .filter(v => Number.isFinite(v));
+
+  const avgR = rValues.length
+    ? rValues.reduce((a,b) => a + b, 0) / rValues.length
+    : null;
+
+  const winRate = completed.length
+    ? (wins.length / completed.length) * 100
+    : null;
+
+  return {
+    setups: entries.length,
+    taken: entries.filter(e => e.taken === 'yes').length,
+    completed: completed.length,
+    wins: wins.length,
+    losses: losses.length,
+    winRate,
+    avgR
+  };
+}
+
+
+function formatPercent(value){
+
+  if(value === null || value === undefined || !Number.isFinite(value)){
+    return '—';
+  }
+
+  return value.toFixed(1) + '%';
+}
+
+
+function formatR(value){
+
+  if(value === null || value === undefined || !Number.isFinite(value)){
+    return '—';
+  }
+
+  const rounded = Number(value.toFixed(2));
+
+  if(rounded > 0){
+    return '+' + rounded + 'R';
+  }
+
+  return rounded + 'R';
+}
+
+
+function metricClass(value){
+
+  if(value === null || value === undefined || !Number.isFinite(value)){
+    return 'stats-neutral';
+  }
+
+  if(value > 0){
+    return 'stats-positive';
+  }
+
+  if(value < 0){
+    return 'stats-negative';
+  }
+
+  return 'stats-neutral';
+}
+
+
+function createPerformanceRow(label, entries){
+
+  const m = getGroupMetrics(entries);
+
+  const tr = document.createElement('tr');
+
+  const smallSample =
+    m.completed > 0 && m.completed < 5
+      ? '<span class="stats-small">small sample</span>'
+      : '';
+
+  tr.innerHTML =
+    '<td>' + label + smallSample + '</td>' +
+    '<td>' + m.setups + '</td>' +
+    '<td>' + m.taken + '</td>' +
+    '<td class="stats-positive">' + m.wins + '</td>' +
+    '<td class="stats-negative">' + m.losses + '</td>' +
+    '<td>' + formatPercent(m.winRate) + '</td>' +
+    '<td class="' + metricClass(m.avgR) + '">' + formatR(m.avgR) + '</td>';
+
+  return tr;
+}
+
+
+function renderGroupedStats(entries, property, bodyId){
+
+  const body = document.getElementById(bodyId);
+
+  if(!body) return;
+
+  body.innerHTML = '';
+
+  const groups = groupEntries(entries, property);
+
+  const keys = Object.keys(groups);
+
+  if(keys.length === 0){
+
+    const tr = document.createElement('tr');
+
+    tr.innerHTML =
+      '<td colspan="7" class="stats-neutral">No data yet</td>';
+
+    body.appendChild(tr);
+
+    return;
+  }
+
+  keys.sort((a,b) => {
+
+    if(a === 'Unspecified') return 1;
+    if(b === 'Unspecified') return -1;
+
+    return String(a).localeCompare(String(b));
+
+  });
+
+  keys.forEach(key => {
+
+    body.appendChild(
+      createPerformanceRow(key, groups[key])
+    );
+
+  });
+
+}
+
+
+function renderScoreStats(entries){
+
+  const body = document.getElementById('stats-score-body');
+
+  if(!body) return;
+
+  body.innerHTML = '';
+
+  const groups = groupEntriesByScore(entries);
+
+  const orderedScores = [
+    '7/7',
+    '6/7',
+    '5/7',
+    '4/7',
+    '3/7',
+    '2/7',
+    '1/7',
+    '0/7',
+    'Unknown'
+  ];
+
+  orderedScores.forEach(score => {
+
+    if(!groups[score]) return;
+
+    body.appendChild(
+      createPerformanceRow(score, groups[score])
+    );
+
+  });
+
+}
+
+
+function renderGradeStats(entries){
+
+  const body = document.getElementById('stats-grade-body');
+
+  if(!body) return;
+
+  body.innerHTML = '';
+
+  const groups = groupEntries(entries, 'grade');
+
+  const order = [
+    'A',
+    'B',
+    'C',
+    'D',
+    'Unspecified'
+  ];
+
+  order.forEach(grade => {
+
+    if(groups[grade]){
+
+      body.appendChild(
+        createPerformanceRow(grade, groups[grade])
+      );
+
+    }
+
+  });
+
+}
+
+
+function renderOverallStats(entries){
+
+  const stats = calculateStats(entries);
+
+  document.getElementById('stat-total-setups').textContent =
+    stats.totalSetups;
+
+  document.getElementById('stat-trades-taken').textContent =
+    stats.tradesTaken;
+
+  document.getElementById('stat-wins').textContent =
+    stats.wins;
+
+  document.getElementById('stat-losses').textContent =
+    stats.losses;
+
+  document.getElementById('stat-breakevens').textContent =
+    stats.breakevens;
+
+  document.getElementById('stat-win-rate').textContent =
+    formatPercent(stats.winRate);
+
+  document.getElementById('stat-avg-r').textContent =
+    formatR(stats.averageR);
+
+  document.getElementById('stat-total-r').textContent =
+    formatR(stats.totalR);
+
+  document.getElementById('stat-win-detail').textContent =
+    stats.completedTrades
+      ? formatPercent((stats.wins / stats.completedTrades) * 100)
+      : 'No completed trades';
+
+  document.getElementById('stat-loss-detail').textContent =
+    stats.completedTrades
+      ? formatPercent((stats.losses / stats.completedTrades) * 100)
+      : 'No completed trades';
+
+  document.getElementById('stat-be-detail').textContent =
+    stats.completedTrades
+      ? formatPercent((stats.breakevens / stats.completedTrades) * 100)
+      : 'No completed trades';
+}
+
+
+async function renderStatistics(){
+
+  const entries = await loadJournalEntries();
+
+  const statsEmpty = document.getElementById('stats-empty');
+  const statsContent = document.getElementById('stats-content');
+  const warning = document.getElementById('stats-sample-warning');
+
+  if(!entries.length){
+
+    statsEmpty.style.display = 'block';
+    statsContent.style.display = 'none';
+    warning.style.display = 'none';
+
+    return;
+  }
+
+  statsEmpty.style.display = 'none';
+  statsContent.style.display = 'block';
+
+  const completed =
+    getCompletedTradeEntries(entries);
+
+  /*
+    We show a sample-size warning when fewer than
+    10 completed trades exist.
+
+    This doesn't stop the statistics from being shown.
+    It simply prevents us from treating a tiny sample
+    as statistically strong evidence.
+  */
+
+  if(completed.length < 10){
+
+    warning.style.display = 'block';
+
+    warning.innerHTML =
+      '<strong>Small sample:</strong> ' +
+      completed.length +
+      ' completed trade' +
+      (completed.length === 1 ? '' : 's') +
+      ' currently recorded. ' +
+      'These statistics are descriptive only and should not be treated as a reliable prediction of future results.';
+
+  } else {
+
+    warning.style.display = 'none';
+
+  }
+
+  renderOverallStats(entries);
+
+  renderScoreStats(entries);
+
+  renderGradeStats(entries);
+
+  renderGroupedStats(
+    entries,
+    'asset',
+    'stats-asset-body'
+  );
+
+  renderGroupedStats(
+    entries,
+    'direction',
+    'stats-direction-body'
+  );
+
+  renderGroupedStats(
+    entries,
+    'session',
+    'stats-session-body'
+  );
+
+  renderGroupedStats(
+    entries,
+    'entryTimeframe',
+    'stats-entry-tf-body'
+  );
+
+  renderGroupedStats(
+    entries,
+    'htfTimeframe',
+    'stats-htf-body'
+  );
+
+  renderGroupedStats(
+    entries,
+    'poiType',
+    'stats-poi-body'
+  );
+}
+
+
+/*
+  Phase 2 already calls renderJournal() after:
+
+  - saving a setup
+  - changing outcome
+  - changing R achieved
+  - deleting a setup
+
+  We wrap that existing function so Phase 3
+  automatically refreshes whenever the journal changes.
+*/
+
+const phase2RenderJournal = renderJournal;
+
+renderJournal = async function(){
+
+  await phase2RenderJournal();
+
+  await renderStatistics();
+
+};
+
+
+/*
+  Initial statistics load.
+*/
+
+renderStatistics();
 </script>
 </body>
 </html>
